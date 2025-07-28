@@ -78,33 +78,14 @@ class BPETokenizer():
     def __init__(self):
         # super().__init__()
         print('init()') # skip original init for now
-    
-    def split_by_special_tokens(self, text: str, special_tokens: list[str]) -> list[str]:
-        """
-        Split on the special tokens
-        example: 
-            text = "Hello world! <|endoftext|> Great!" 
-            special_tokens = "<|endoftext|>"
-            result = ['Hello world! ', '<|endoftext|>', ' Great!']
-        """
-        # Sorts tokens by length (longest first). This prevents partial matches when tokens overlap (e.g., <|end|> and <|endoftext|>).
-        special_tokens_sorted = sorted(special_tokens, key=lambda x: -len(x))
-        if not special_tokens_sorted:
-            parts = [text]
-        else:
-            # Escapes each token for safe regex use.
-            # Joins them with | (regex OR), so any token can be matched.
-            pattern = "|".join(re.escape(tok) for tok in special_tokens_sorted)
-            parts = re.split('(' + pattern + ')', text)
 
-        return parts
     
     def tokenize(self, text: str, special_tokens: list[str], drop_special_token: bool = True) -> list[bytes]:
         """
         Seperating text into pretokens
         Special tokens are independent pretokens
         """
-        parts = self.split_by_special_tokens(text, special_tokens)
+        parts = split_by_special_tokens(text, special_tokens)
 
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         tokens_list = []
@@ -120,9 +101,11 @@ class BPETokenizer():
         tokens = [token for part_tokens in tokens_list for token in part_tokens]
         return tokens
     
-    def _tokenize_helper(self, args):
-        tokenizer, chunk, special_tokens, drop_special_token = args
-        return tokenizer.tokenize(chunk, special_tokens, drop_special_token)
+    def worker(self, text: str, special_tokens: list[str], q: Queue):
+        """Worker pretokenizing process for multiprocessing"""
+        pretokens = self.tokenize(text, special_tokens)
+        q.put(pretokens)
+        print("worker done")
     
     def merge(self, counts: dict[tuple[int, int], int], index_dict: dict[tuple[int, int],set[int]], pretokens: list[list[int]], max_pair: (int, int), new_index: int):
         """Merge the pairs with highest frequency and update counts, index_dict"""
@@ -213,8 +196,7 @@ class BPETokenizer():
         # Initializations
         special_tokens = special_tokens or []
         num_merges = max(vocab_size - len(special_tokens) - 256, 0)
-        special_token_bytes = {tok.encode("utf-8") for tok in special_tokens}
-        print("special_token_bytes:", special_token_bytes)
+
         chunk_list = []
         num_chunks= 4
 
@@ -233,23 +215,33 @@ class BPETokenizer():
                 f.seek(start)
                 chunk = f.read(end - start).decode("utf-8", errors="ignore")
                 chunk_list.append(chunk)
-    
-        # Parallel tokenize
-        args_list = [(self, chunk, special_tokens, True) for chunk in chunk_list]
 
-        # token_lists_per_chunk is a list of lists of tokens, one per chunk
-        token_lists_per_chunk = []
-        with multiprocessing.Pool() as pool:
-            token_lists_per_chunk = pool.map(self._tokenize_helper, args_list)
-        
-        all_tokens = [token for token_list in token_lists_per_chunk for token in token_list]
+        print("chunk_list length is:", len(chunk_list))
+
+        # Parallel tokenize
+        pretokens_list = []
+        processes = []
+        q = Queue()
+        for chunk in chunk_list:
+            p = Process(target=self.worker, args=(chunk, special_tokens, q))
+            p.start()
+            processes.append(p)
+
+        pretokens_list = [q.get() for _ in processes]
+
+        for p in processes:
+            p.join()
+
+        pretokens = [token for tokens in pretokens_list for token in tokens]
+
+        print("pretokens length is:", len(pretokens))
 
         # Merging
         counts = defaultdict(int)
         index_dict = defaultdict(set)  # key is a tuple of two integers (index1, index2), value is a set of indices in all_tokens when tuple occurs
 
         # Iterates over every token in all_tokens, where j is the index and token is a bytes object (e.g., b'Hello').
-        for j, token in enumerate(all_tokens):
+        for j, token in enumerate(pretokens):
             # For each token (which is a bytes object), this loops over every pair of consecutive bytes in that token.
             # If token = b'cat', then zip(token, token[1:]) yields (99, 97) and (97, 116) (ASCII codes for 'c', 'a', 't').
             for index1, index2 in zip(token, token[1:]):
@@ -279,12 +271,9 @@ class BPETokenizer():
             # index_dict, key is a tuple of two integers (index1, index2), value is index of the token in all_tokens
             # max_pair is a tuple of two integers (index1, index2)
             # new_index is the index of the new merged token in the vocabulary
-            merge(counts, index_dict, all_tokens, max_pair, new_index)
+            self.merge(counts, index_dict, pretokens, max_pair, new_index)
 
         return (vocab, merges)
-        
-    def train(self, text, vocab_size, verbose=False):
-        return None
 
     def decode(self, ids):
         return None
