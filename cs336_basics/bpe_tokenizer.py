@@ -60,6 +60,67 @@ class BPETokenizer(Tokenizer):
         tokenizer, chunk, special_tokens, drop_special_token = args
         return tokenizer.tokenize(chunk, special_tokens, drop_special_token)
     
+    def merge(self, counts: dict[tuple[int, int], int], index_dict: dict[tuple[int, int],set[int]], pretokens: list[list[int]], max_pair: (int, int), new_index: int):
+        """Merge the pairs with highest frequency and update counts, index_dict"""
+        # # counts is a defaultdict(int) where keys are pairs of integers (index1, index2), value is the count of the pair
+        # index_dict, key is a tuple of two integers (index1, index2), value is index of the token in all_tokens
+        # pretokens is a list of lists, where each inner list is a pretoken (list of integers)
+        # max_pair is a tuple of two integers (index1, index2)
+        # new_index is the index of the new merged token in the vocabulary
+
+
+
+        # index_dict, key is a tuple of two integers (index1, index2), value is index of the token in all_tokens
+        # index_set is a set of indices in pretokens where max_pair occurs
+        index_set = index_dict[max_pair]
+
+        # iterate over each token that contains max_pair
+        for i in index_set:
+            pretoken = pretokens[i]
+            new_pretoken = [] # new token after merge looks different from the original pretoken, need to create a new one
+            pos_list = []   # Store positions of max_pair for each new pretoken after merge
+            pos = 0
+            j = 0
+
+            # Replace max_pair with new_index in each pretoken
+            while j < len(pretoken):
+                if (j < len(pretoken)-1) and ((pretoken[j], pretoken[j+1]) == max_pair):
+                    new_pretoken.append(new_index) # result after merge, for example (A, B) -> C then only append C
+                    pos_list.append(pos) # position of the new index in the pretoken
+                    j += 2
+                else:
+                    new_pretoken.append(pretoken[j]) # cannot merge, so keep the original byte
+                    j += 1
+                pos += 1
+
+            # Update counts and index_dict
+            for pos in pos_list:
+                counts[max_pair] -= 1 # since we merged max_pair, we need to decrease its count
+
+                if pos > 0:
+                    # If true, it means two merged pairs are now adjacent (e.g., [... new_index, new_index ...])
+                    # [A, B, A, B] -> [C, C], in this case we need to reduce the count of the pair (B, A)
+                    # So it need to reduce reversed C in this case, which is (max_pair[1], max_pair[0])
+                    if new_pretoken[pos-1] == new_index:
+                        counts[(max_pair[1], max_pair[0])] -= 1
+                    # else case, If the previous symbol is not the new merged symbol, you decrement the count for the pair that was previously there: (new_pretoken[pos-1], max_pair[0]).
+                    else:
+                        counts[(new_pretoken[pos-1], max_pair[0])] -= 1
+
+                    counts[(new_pretoken[pos-1], new_pretoken[pos])] += 1 # a new pair is created after merge
+                    index_dict[(new_pretoken[pos-1], new_pretoken[pos])].add(i) # update index_dict with the new pair
+
+                if pos < len(new_pretoken)-1:
+                    if new_pretoken[pos+1] == new_index:
+                        counts[(max_pair[1], max_pair[0])] -= 1     
+                    else:
+                        counts[(max_pair[1], new_pretoken[pos+1])] -= 1
+
+                    counts[(new_pretoken[pos], new_pretoken[pos+1])] += 1
+                    index_dict[(new_pretoken[pos], new_pretoken[pos+1])].add(i)
+
+            pretokens[i] = new_pretoken
+    
     def train_bpe(
         self,
         input_path: str | os.PathLike,
@@ -67,6 +128,23 @@ class BPETokenizer(Tokenizer):
         special_tokens: list[str],
         **kwargs,
     ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+        # Args:
+        #     input_path (str | os.PathLike): Path to BPE tokenizer training data.
+        #     vocab_size (int): Total number of items in the tokenizer's vocabulary (including special tokens).
+        #     special_tokens (list[str]): A list of string special tokens to be added to the tokenizer vocabulary.
+        #         These strings will never be split into multiple tokens, and will always be
+        #         kept as a single token. If these special tokens occur in the `input_path`,
+        #         they are treated as any other string.
+
+        # Returns:
+        #     tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+        #         vocab:
+        #             The trained tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
+        #             to bytes (token bytes)
+        #         merges:
+        #             BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
+        #             representing that <token1> was merged with <token2>.
+        #             Merges are ordered by order of creation.
     
         # Initializations
         special_tokens = special_tokens or []
@@ -74,6 +152,13 @@ class BPETokenizer(Tokenizer):
         special_token_bytes = {tok.encode("utf-8") for tok in special_tokens}
         chunk_list = []
         num_chunks= 4
+
+        # Initialize vocab
+        vocab = {}
+        vocab = {x:bytes([x]) for x in range(0,256)}
+        for i, token in enumerate(special_tokens):
+            vocab[256+i] = token.encode("utf-8")
+        merges = []
         
         # Chunk the text file
         with open(input_path, "rb") as f:
@@ -96,33 +181,48 @@ class BPETokenizer(Tokenizer):
 
         # Merging
         counts = defaultdict(int)
-        index_dict = defaultdict(set)  # Store pretoken location for each pair
+        index_dict = defaultdict(set)  # key is a tuple of two integers (index1, index2), value is a set of indices in all_tokens when tuple occurs
 
+        # Iterates over every token in all_tokens, where j is the index and token is a bytes object (e.g., b'Hello').
+        for j, token in enumerate(all_tokens):
+            # For each token (which is a bytes object), this loops over every pair of consecutive bytes in that token.
+            # If token = b'cat', then zip(token, token[1:]) yields (99, 97) and (97, 116) (ASCII codes for 'c', 'a', 't').
+            for index1, index2 in zip(token, token[1:]):
+                counts[index1, index2] += 1
+                index_dict[index1, index2].add(j)
+        
+        for i in range(num_merges):
+            # Prefer lexicographically greater pair
+            # Example: max([("A", "B"), ("A", "C"), ("B", "ZZ"), ("BA", "A")]) = ('BA', 'A')
+            max_pair = max(
+                counts.items(),
+                key=lambda x: (
+                    x[1],  
+                    vocab[x[0][0]].decode("utf-8", errors="ignore"),
+                    vocab[x[0][1]].decode("utf-8", errors="ignore")
+                )
+            )[0]
 
+            index1, index2 = max_pair
+
+            new_index = 256 + len(special_tokens) + i
+
+            vocab[new_index] = vocab[index1] + vocab[index2]
+            merges.append((vocab[index1], vocab[index2]))
+
+            # counts is a defaultdict(int) where keys are pairs of integers (index1, index2), value is the count of the pair
+            # index_dict, key is a tuple of two integers (index1, index2), value is index of the token in all_tokens
+            # max_pair is a tuple of two integers (index1, index2)
+            # new_index is the index of the new merged token in the vocabulary
+            merge(counts, index_dict, all_tokens, max_pair, new_index)
+
+        return (vocab, merges)
+        
     def train(self, text, vocab_size, verbose=False):
         return None
 
     def decode(self, ids):
-        # given ids (list of integers), return Python string
-        text_bytes = b"".join(self.vocab[idx] for idx in ids)
-        text = text_bytes.decode("utf-8", errors="replace")
-        return text
-
+        return None
+    
     def encode(self, text):
-        # given a string text, return the token ids
-        text_bytes = text.encode("utf-8") # raw bytes
-        ids = list(text_bytes) # list of integers in range 0..255
-        while len(ids) >= 2:
-            # find the pair with the lowest merge index
-            stats = get_stats(ids)
-            pair = min(stats, key=lambda p: self.merges.get(p, float("inf")))
-            # subtle: if there are no more merges available, the key will
-            # result in an inf for every single pair, and the min will be
-            # just the first pair in the list, arbitrarily
-            # we can detect this terminating case by a membership check
-            if pair not in self.merges:
-                break # nothing else can be merged anymore
-            # otherwise let's merge the best pair (lowest merge index)
-            idx = self.merges[pair]
-            ids = merge(ids, pair, idx)
-        return ids
+        return None
