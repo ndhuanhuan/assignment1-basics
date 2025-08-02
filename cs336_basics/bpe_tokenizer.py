@@ -7,7 +7,17 @@ from cs336_basics.utils import find_chunk_boundaries, split_by_special_tokens
 
 class BPETokenizer():
 
+
+
     def __init__(self, vocab: dict[int, bytes] | None = None, merges: list[tuple[bytes, bytes]] | None = None, special_tokens: list[str]| None = None):
+        # Args:
+        # vocab (dict[int, bytes]): The tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
+        #     to bytes (token bytes)
+        # merges (list[tuple[bytes, bytes]]): BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
+        #     representing that <token1> was merged with <token2>.
+        #     Merges are ordered by order of creation.
+        # special_tokens (list[str] | None): A list of string special tokens for the tokenizer. These strings will never
+        #     be split into multiple tokens, and will always be kept as a single token.
         self.vocab = vocab
         self.merges = merges
         self.special_tokens = special_tokens or []
@@ -226,8 +236,12 @@ class BPETokenizer():
     def encode(self, text:str) -> list[int]:
         """Encode an input text into a sequence of token IDs."""
 
-        vocab_reversed = {v: k for k, v in self.vocab.items()}  # bytes: int
+        vocab_reversed = {v: k for k, v in self.vocab.items()}  # bytes: int, a lookup table for bytes to index
+        # text is: Hello, how are you?
+        # byte_pretokens is: [b'Hello', b',', b' how', b' are', b' you', b'?']
         byte_pretokens = self.tokenize(text, self.special_tokens, drop_special_token=False)   # list[bytes]
+        print("text is:", text) # 
+        print("byte_pretokens is:", byte_pretokens)
         byte_special_tokens = [token.encode('utf-8') for token in self.special_tokens]
         pretokens = []  # list[list[int]]
 
@@ -245,6 +259,8 @@ class BPETokenizer():
                     new_pretoken.append(index)
 
             pretokens.append(new_pretoken)
+        # pretokens is: [[39, 68, 75, 75, 78], [11], [220, 71, 78, 86], [220, 64, 81, 68], [220, 88, 78, 84], [30]]
+        # print("pretokens is:", pretokens)  
 
         # Merge
         for i, pretoken in enumerate(pretokens):
