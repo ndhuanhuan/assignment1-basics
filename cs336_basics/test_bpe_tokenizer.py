@@ -3,7 +3,7 @@
 from cs336_basics.bpe_tokenizer import BPETokenizer
 
 def main():
-    file_path = "./data/TinyStoriesV2-GPT4-train.txt"
+    file_path = "./data/tinystories_sample_5M.txt"
     vocab_size = 500
     special_tokens = ["<|endoftext|>", "<|endoftext|><|endoftext|>"]
 

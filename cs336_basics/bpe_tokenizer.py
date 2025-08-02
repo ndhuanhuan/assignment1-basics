@@ -18,7 +18,7 @@ class BPETokenizer():
         Seperating text into pretokens
         Special tokens are independent pretokens
         """
-        parts = split_by_special_tokens(text, special_tokens)
+        parts = split_by_special_tokens(text, special_tokens) # parts looks like ['Hello world! ', '<|endoftext|>', ' Great!']
 
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         tokens_list = []
@@ -58,7 +58,10 @@ class BPETokenizer():
         for i in index_set:
             pretoken = pretokens[i]
             new_pretoken = [] # new token after merge looks different from the original pretoken, need to create a new one
-            pos_list = []   # Store positions of max_pair for each new pretoken after merge
+
+            # Store positions of max_pair for each new pretoken after merge, 
+            # even in a single pretoken, there can be multiple max_pair / merges happens
+            pos_list = []   
             pos = 0
             j = 0
 
@@ -71,7 +74,7 @@ class BPETokenizer():
                 else:
                     new_pretoken.append(pretoken[j]) # cannot merge, so keep the original byte
                     j += 1
-                pos += 1
+                pos += 1 # here pos is the position of the new pretoken, not the original pretoken, you don't see plus 2 case here, because we always append new_index when we merge, so pos is always incremented by 1
 
             # Update counts and index_dict
             for pos in pos_list:
@@ -140,9 +143,13 @@ class BPETokenizer():
             vocab[256+i] = token.encode("utf-8")
         merges = []
         
+        # Note: How vocab looks like
+        # vocab = {0: b'\x00', 1: b'\x01', ..., 255: b'\xff', 256: b'<|endoftext|>', ...}
+        
         # Chunk the text file
         with open(input_path, "rb") as f:
             boundaries = find_chunk_boundaries(f, num_chunks, "<|endoftext|>".encode("utf-8"))
+            print("boundaries are:", boundaries)
 
             for start, end in zip(boundaries[:-1], boundaries[1:]):
                 f.seek(start)
@@ -150,6 +157,7 @@ class BPETokenizer():
                 chunk_list.append(chunk)
 
         print("chunk_list length is:", len(chunk_list))
+        # print("chunk_list[0] is:", chunk_list[0])
 
         # Parallel tokenize
         pretokens_list = []
@@ -168,6 +176,7 @@ class BPETokenizer():
         pretokens = [token for tokens in pretokens_list for token in tokens]
 
         print("pretokens length is:", len(pretokens))
+        print("pretokens[:10] is:", pretokens[:10]) # pretokens[:10] is: [b'u', b' don', b"'t", b' have', b' to', b' be', b' scared', b' of', b' the', b' loud']
 
         # Merging
         counts = defaultdict(int)
@@ -177,9 +186,10 @@ class BPETokenizer():
         for j, token in enumerate(pretokens):
             # For each token (which is a bytes object), this loops over every pair of consecutive bytes in that token.
             # If token = b'cat', then zip(token, token[1:]) yields (99, 97) and (97, 116) (ASCII codes for 'c', 'a', 't').
+            # token looks like b'cat', index1 = 99, index2 = 97
             for index1, index2 in zip(token, token[1:]):
-                counts[index1, index2] += 1
-                index_dict[index1, index2].add(j)
+                counts[index1, index2] += 1 # this is for finding largest counts later,  so we can merge the most frequent pairs
+                index_dict[index1, index2].add(j) # this is for easily finding the index of this pair in pretokens, used later in merge function
         
         for i in range(num_merges):
             # Prefer lexicographically greater pair
