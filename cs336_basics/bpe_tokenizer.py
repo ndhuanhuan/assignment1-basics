@@ -1,4 +1,5 @@
 import os
+from typing import Iterable, Iterator
 import regex as re
 from collections import defaultdict
 from multiprocessing import Process, Queue
@@ -6,9 +7,10 @@ from cs336_basics.utils import find_chunk_boundaries, split_by_special_tokens
 
 class BPETokenizer():
 
-    def __init__(self):
-        # super().__init__()
-        print('init()') # skip original init for now
+    def __init__(self, vocab: dict[int, bytes] | None = None, merges: list[tuple[bytes, bytes]] | None = None, special_tokens: list[str]| None = None):
+        self.vocab = vocab
+        self.merges = merges
+        self.special_tokens = special_tokens or []
 
     
     def tokenize(self, text: str, special_tokens: list[str], drop_special_token: bool = True) -> list[bytes]:
@@ -206,8 +208,79 @@ class BPETokenizer():
 
         return (vocab, merges)
 
-    def decode(self, ids):
-        return None
+    @classmethod
+    def from_files(cls, vocab_filepath: str, merges_filepath: str, special_tokens: list[str] | None = None):
+        """Class method that constructs and return a Tokenizer from a serialized vocabulary and list of merges"""
+        raise NotImplementedError
     
-    def encode(self, text):
-        return None
+    def encode(self, text:str) -> list[int]:
+        """Encode an input text into a sequence of token IDs."""
+
+        vocab_reversed = {v: k for k, v in self.vocab.items()}  # bytes: int
+        byte_pretokens = self.tokenize(text, self.special_tokens, drop_special_token=False)   # list[bytes]
+        byte_special_tokens = [token.encode('utf-8') for token in self.special_tokens]
+        pretokens = []  # list[list[int]]
+
+        # Convert pretokens from bytes to list[int] by vocab
+        for i, pretoken in enumerate(byte_pretokens):
+
+            new_pretoken = []
+
+            if pretoken in byte_special_tokens:
+                index = vocab_reversed[pretoken]
+                new_pretoken.append(index)
+            else:
+                for b in pretoken:
+                    index = vocab_reversed[bytes([b])]
+                    new_pretoken.append(index)
+
+            pretokens.append(new_pretoken)
+
+        # Merge
+        for i, pretoken in enumerate(pretokens):
+            for merge in self.merges:
+                new_pretoken = []
+                new_index = vocab_reversed[merge[0] + merge[1]]
+                j = 0
+                while j < len(pretoken):
+                    if (j < len(pretoken)-1) and ((self.vocab[pretoken[j]], self.vocab[pretoken[j+1]]) == merge):
+                        new_pretoken.append(new_index)
+                        j += 2
+                    else:
+                        new_pretoken.append(pretoken[j])
+                        j += 1
+
+                pretoken = new_pretoken
+
+            pretokens[i] = pretoken
+
+        tokens = [token for pretoken in pretokens for token in pretoken] 
+        return tokens
+
+    def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
+        """Given an iterable of strings (e.g., a Python file handle), 
+        return a generator that lazily yields token IDs. 
+        This is required for memory-eﬀicient tokenization of large files 
+        that we cannot directly load into memory.
+        """
+        for line in iterable:
+            for idx in self.encode(line):
+                yield idx
+
+
+    def decode(self, ids: list[int]) -> str:
+        """Decode a sequence of token IDs into text."""
+        tokens = bytes()
+        vocab_size = len(self.vocab)
+        replacement_char = "\uFFFD"
+
+        for token_id in ids:
+            if token_id < vocab_size:
+                token = self.vocab[token_id]    # bytes
+            else:
+                token = bytes(replacement_char, encoding='utf-8')   # Replace tokens with Unicode replacement characters if index out of bounds
+
+            tokens += token
+        decoded = tokens.decode(encoding='utf-8', errors='replace')
+
+        return decoded 
