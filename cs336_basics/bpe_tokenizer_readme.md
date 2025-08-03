@@ -16,3 +16,8 @@ uv run pytest tests/test_tokenizer.py
 uv run pytest -k test_linear
 uv run pytest -k test_embedding
 ```
+
+# Test 3.5.1
+```sh
+uv run pytest -k test_rmsnorm
+```
