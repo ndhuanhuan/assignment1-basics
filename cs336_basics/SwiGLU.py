@@ -28,7 +28,9 @@ class SwiGLU(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.d_ff = d_ff
-        # TODO: didn't use the adjust_dff function in the original code, but it seems to be intended to ensure d_ff is a multiple of 64.
+        assert d_model % 64 == 0, "d_model must be divisible by 64"
+        if d_ff is None:
+            self.d_ff = d_model * 8 // 3
         # self.dff = self.adjust_dff(d_model) if d_ff < self.adjust_dff(d_model) else d_ff
         # Three linear layers to match the test adapter's expected weights
         self.w1 = nn.Linear(d_model, self.d_ff, bias=False, device=device, dtype=dtype)
