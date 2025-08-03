@@ -22,7 +22,8 @@ class Linear(nn.Module):
         self.device = device
         self.dtype = dtype
         self.weight: nn.Parameter = nn.Parameter(
-            torch.empty(out_features, in_features, device=device, dtype=dtype)
+            torch.empty(out_features, in_features, device=device, dtype=dtype),
+            requires_grad=True
         )
         # Initialize weights using a truncated normal distribution:
         # mean=0, std=sqrt(2/(in_features+out_features)), truncated at [-3*std, 3*std]

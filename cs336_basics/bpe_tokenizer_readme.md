@@ -9,3 +9,10 @@ uv run pytest tests/test_train_bpe.py
 ```sh
 uv run pytest tests/test_tokenizer.py
 ```
+
+
+# How to test 3.4
+```sh
+uv run pytest -k test_linear
+uv run pytest -k test_embedding
+```
