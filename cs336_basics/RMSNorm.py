@@ -17,7 +17,7 @@ Summary:
 - Use * for elementwise scaling with broadcasting.
 - Use @ for matrix multiplication, which may require transposing for correct dimensions.
 """
-
+# https://zhuanlan.zhihu.com/p/685181632
 import torch
 import torch.nn as nn
 from torch import Tensor

@@ -17,7 +17,8 @@ uv run pytest -k test_linear
 uv run pytest -k test_embedding
 ```
 
-# Test 3.5.1
+# Test 3.5
 ```sh
 uv run pytest -k test_rmsnorm
+uv run pytest -k test_swiglu
 ```
