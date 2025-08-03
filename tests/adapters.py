@@ -9,6 +9,7 @@ import numpy.typing as npt
 import torch
 from torch import Tensor
 
+from cs336_basics.Linear import Linear
 from cs336_basics.bpe_tokenizer import BPETokenizer
 
 
@@ -32,7 +33,11 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
 
-    raise NotImplementedError
+    model = Linear(d_in, d_out)
+    model.weight.data.copy_(weights)
+    output = model(in_features)
+
+    return output
 
 
 def run_embedding(
