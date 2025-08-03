@@ -1,3 +1,23 @@
+"""
+RMSNorm Layer Summary
+
+This file implements Root Mean Square Layer Normalization (RMSNorm) as a PyTorch nn.Module.
+RMSNorm normalizes each input vector by its root mean square (RMS) value, then scales each feature
+by a learnable weight. This technique is similar to LayerNorm but does not subtract the mean, making it
+more efficient and sometimes more stable for deep learning models like Transformers.
+
+- Input: Tensor of shape (..., d_model)
+- Normalization: Each vector in the last dimension is divided by its RMS value (sqrt(mean(x^2)))
+- Scaling: Each feature is multiplied by a learnable parameter (gamma) of shape (d_model,)
+- Output: Tensor of the same shape as input, normalized and scaled
+
+Detailed comments and examples are provided in the code below to illustrate each step and broadcasting behavior.
+
+Summary:
+- Use * for elementwise scaling with broadcasting.
+- Use @ for matrix multiplication, which may require transposing for correct dimensions.
+"""
+
 import torch
 import torch.nn as nn
 from torch import Tensor
