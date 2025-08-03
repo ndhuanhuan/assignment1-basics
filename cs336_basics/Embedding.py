@@ -16,6 +16,16 @@ Example:
 If self.weight is (10000, 768) and token_ids is (2, 5):
     self.weight[token_ids, :] returns (2, 5, 768), where each [i, j, :] is the embedding for token_ids[i, j].
 
+Detailed Example:
+Suppose token_ids is:
+    [[4, 7, 2, 9, 1],
+     [3, 8, 6, 0, 5]]
+and self.weight is (10000, 768).
+Then self.weight[token_ids, :] returns a tensor of shape (2, 5, 768), where:
+    - The first row contains the embeddings for token IDs [4, 7, 2, 9, 1]
+    - The second row contains the embeddings for token IDs [3, 8, 6, 0, 5]
+    - Each [i, j, :] is the embedding vector for token_ids[i, j]
+
 This is the standard way embedding layers work in deep learning frameworks.
 """
 
