@@ -5,6 +5,7 @@ from jaxtyping import Float
 
 # https://www.bilibili.com/video/BV1jmquYpEhn/?spm_id_from=333.337.search-card.all.click&vd_source=48e4bed01dd155111c1b309b768743f6
 # https://github.com/HongYan-L/cs336_ass1/blob/main/adapters.py#L1063
+# https://github.com/yaozile123/assignment1-basics/blob/main/cs336_basics/layers.py#L81
 class SwiGLU(nn.Module):
     def __init__(
         self,

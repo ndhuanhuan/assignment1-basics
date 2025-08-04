@@ -240,8 +240,8 @@ class BPETokenizer():
         # text is: Hello, how are you?
         # byte_pretokens is: [b'Hello', b',', b' how', b' are', b' you', b'?']
         byte_pretokens = self.tokenize(text, self.special_tokens, drop_special_token=False)   # list[bytes]
-        print("text is:", text) # 
-        print("byte_pretokens is:", byte_pretokens)
+        # print("text is:", text) # 
+        # print("byte_pretokens is:", byte_pretokens)
         byte_special_tokens = [token.encode('utf-8') for token in self.special_tokens]
         pretokens = []  # list[list[int]]
 
