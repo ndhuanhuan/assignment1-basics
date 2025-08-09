@@ -74,10 +74,40 @@ class RotaryPositionalEmbedding(nn.Module):
         freq= 1.0 / (theta ** (torch.arange(0, d_k, 2, device=device).float() / d_k))
 
         # shape: (max_seq_len, d_k // 2)
+        # Note: This shape comes from combining every possible position (max_seq_len rows)
+        # with every possible frequency/feature pair (d_k // 2 columns).
+        # Each entry represents the rotation angle for a specific position and feature pair,
+        # which is exactly what RoPE needs to encode positional information for all tokens and all
+        # frequencies.
         positions = torch.arange(max_seq_len, device=device).float()
         freqs = torch.outer(positions, freq)
 
         # cache cos/sin; no gradients needed → persistent=False
+        # cos_cached and sin_cached are 2D tables of shape (max_seq_len, d_k // 2)
+        # - Each row represents a token position in the sequence (0 to max_seq_len-1)
+        # - Each column represents a frequency/feature pair (0 to d_k//2-1)
+        # - Each entry is the cosine or sine of the rotation angle for that position and frequency:
+        #     cos_cached[pos, freq] = cos(positions[pos] * freq[freq])
+        #     sin_cached[pos, freq] = sin(positions[pos] * freq[freq])
+        #
+        # Example:
+        # If max_seq_len = 4 and d_k = 6 (so d_k // 2 = 3):
+        # positions = [0, 1, 2, 3]
+        # freq = [f0, f1, f2]
+        # cos_cached =
+        # [
+        #   [cos(0*f0), cos(0*f1), cos(0*f2)],  # position 0
+        #   [cos(1*f0), cos(1*f1), cos(1*f2)],  # position 1
+        #   [cos(2*f0), cos(2*f1), cos(2*f2)],  # position 2
+        #   [cos(3*f0), cos(3*f1), cos(3*f2)],  # position 3
+        # ]
+        # sin_cached =
+        # [
+        #   [sin(0*f0), sin(0*f1), sin(0*f2)],  # position 0
+        #   [sin(1*f0), sin(1*f1), sin(1*f2)],  # position 1
+        #   [sin(2*f0), sin(2*f1), sin(2*f2)],  # position 2
+        #   [sin(3*f0), sin(3*f1), sin(3*f2)],  # position 3
+        # ]
         self.register_buffer("cos_cached", torch.cos(freqs), persistent=False)
         self.register_buffer("sin_cached", torch.sin(freqs), persistent=False)
         
@@ -94,10 +124,13 @@ class RotaryPositionalEmbedding(nn.Module):
 
         # Gather the cached tables for the required positions.
         # Resulting shape: (..., seq_len, d_k // 2)
-        cos_pos = self.cos_cached[token_positions]
+        cos_pos = self.cos_cached[token_positions] # since token_positions length is seq_len, so shape is (..., seq_len, d_k // 2)
         sin_pos = self.sin_cached[token_positions]
 
         # Split even / odd channels.
+        # x[..., ::2] selects all even-indexed features in the last dimension (feature pairs).
+        # x[..., 1::2] selects all odd-indexed features in the last dimension.
+        # This is necessary because RoPE rotates each pair of features (even, odd) together using the cached cos/sin values.
         x_even = x[..., ::2]
         x_odd  = x[..., 1::2]
 
@@ -106,6 +139,12 @@ class RotaryPositionalEmbedding(nn.Module):
         out_odd  = x_even * sin_pos + x_odd * cos_pos
 
         # Re-interleave.
+        # This is a computational trick for efficiency:
+        # - After rotating each feature pair (even, odd) using RoPE, we need to reconstruct the original feature order.
+        # - out_even contains all rotated even-indexed features, out_odd contains all rotated odd-indexed features.
+        # - By assigning out[..., ::2] = out_even and out[..., 1::2] = out_odd,
+        #   we efficiently restore the full tensor with positional information encoded, without explicit loops.
+        # - This leverages fast, vectorized tensor operations for hardware acceleration.
         out = torch.empty_like(x)
         out[..., ::2] = out_even
         out[..., 1::2] = out_odd
