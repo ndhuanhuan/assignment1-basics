@@ -15,7 +15,7 @@ from cs336_basics.RMSNorm import RMSNorm
 from cs336_basics.RotaryPositionalEmbedding import RotaryPositionalEmbedding
 from cs336_basics.bpe_tokenizer import BPETokenizer
 from cs336_basics.SwiGLU import SwiGLU
-from cs336_basics.Softmax import softmax
+from cs336_basics.Attention import softmax
 
 
 def run_linear(
