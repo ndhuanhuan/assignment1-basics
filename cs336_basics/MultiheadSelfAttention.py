@@ -26,6 +26,7 @@ class MultiheadSelfAttention(nn.Module):
             token_positions (Int[Tensor, " ... sequence_length"] | None): Optional tensor with the positions of the tokens
         """
         super().__init__()
+        assert d_model % num_heads == 0
         self.d_model = d_model
         self.num_heads = num_heads
         self.use_rope = use_rope
@@ -34,11 +35,14 @@ class MultiheadSelfAttention(nn.Module):
             if use_rope else None
         )
         self.token_positions = token_positions
-        self.q_proj = Linear(d_model, d_model)
-        self.k_proj = Linear(d_model, d_model)
-        self.v_proj = Linear(d_model, d_model)
-        self.o_proj = Linear(d_model, d_model)
-    
+        self.d_k = d_model // num_heads
+        self.d_v = self.d_k
+
+        self.q_proj = Linear(self.d_model, self.num_heads * self.d_k)
+        self.k_proj = Linear(self.d_model, self.num_heads * self.d_k)
+        self.v_proj = Linear(self.d_model, self.num_heads * self.d_v)
+        self.o_proj = Linear(self.num_heads * self.d_v, self.d_model)
+
     def forward(self, in_features: torch.Tensor):
         """
         Args:
