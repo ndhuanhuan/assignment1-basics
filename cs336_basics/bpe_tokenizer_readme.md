@@ -32,4 +32,5 @@ uv run pytest -k test_multihead_self_attention
 # Test 3.6
 ```sh
 uv run pytest -k test_transformer_block
+uv run pytest -k test_transformer_lm
 ```

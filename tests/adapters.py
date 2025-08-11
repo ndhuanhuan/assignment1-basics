@@ -15,6 +15,7 @@ from cs336_basics.MultiheadSelfAttention import MultiheadSelfAttention
 from cs336_basics.RMSNorm import RMSNorm
 from cs336_basics.RotaryPositionalEmbedding import RotaryPositionalEmbedding
 from cs336_basics.Transformer import TransformerBlock
+from cs336_basics.TransformerLM import TransformerLM
 from cs336_basics.bpe_tokenizer import BPETokenizer
 from cs336_basics.SwiGLU import SwiGLU
 from cs336_basics.Attention import softmax, scaled_dot_product_attention
@@ -411,7 +412,34 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    model = TransformerLM(
+        vocab_size=vocab_size,
+        context_length=context_length,
+        d_model=d_model,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        rope_theta=rope_theta
+    )
+
+    model.token_embeddings.weight.data.copy_(weights["token_embeddings.weight"])
+    
+    for layer_idx in range(num_layers):
+        model.layers[layer_idx].attn.q_proj.weight.data.copy_(weights[f"layers.{layer_idx}.attn.q_proj.weight"])
+        model.layers[layer_idx].attn.k_proj.weight.data.copy_(weights[f"layers.{layer_idx}.attn.k_proj.weight"])
+        model.layers[layer_idx].attn.v_proj.weight.data.copy_(weights[f"layers.{layer_idx}.attn.v_proj.weight"])
+        model.layers[layer_idx].attn.o_proj.weight.data.copy_(weights[f"layers.{layer_idx}.attn.output_proj.weight"])
+        model.layers[layer_idx].rms_norm1.weight.data.copy_(weights[f"layers.{layer_idx}.ln1.weight"])
+        model.layers[layer_idx].ffn.w1.weight.data.copy_(weights[f"layers.{layer_idx}.ffn.w1.weight"])
+        model.layers[layer_idx].ffn.w2.weight.data.copy_(weights[f"layers.{layer_idx}.ffn.w2.weight"])
+        model.layers[layer_idx].ffn.w3.weight.data.copy_(weights[f"layers.{layer_idx}.ffn.w3.weight"])
+        model.layers[layer_idx].rms_norm2.weight.data.copy_(weights[f"layers.{layer_idx}.ln2.weight"])
+
+    model.ln_final.weight.data.copy_(weights["ln_final.weight"]) # rms_norm layer weights
+    model.lm_head.weight.data.copy_(weights["lm_head.weight"]) # Linear layer weights
+
+    output = model(in_indices)
+    return output
 
 
 def run_rmsnorm(
