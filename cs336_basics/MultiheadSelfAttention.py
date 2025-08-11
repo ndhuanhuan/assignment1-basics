@@ -1,4 +1,5 @@
 from einops import rearrange
+import einx
 import torch
 import torch.nn as nn
 
@@ -84,7 +85,12 @@ class MultiheadSelfAttention(nn.Module):
         q, k, v = (
             rearrange(X, "... seq (heads d) -> ... heads seq d", heads=self.num_heads)
             for X in (q, k, v)
-        ) 
+        )
+
+        # Refered to: https://github.com/Aeon0418/CS336_a1/blob/68b35143734ff1c72f0ed88d309e2ddeec36b8e6/cs336_basics/model/msa.py
+        if self.token_positions is None:
+            self.token_positions = einx.rearrange("seq -> b... seq", torch.arange(seq_len, device=in_features.device), b=[1] * len(b))
+        self.token_positions = rearrange(self.token_positions, "... seq -> ... 1 seq")
 
         if self.use_rope:
             q = self.rope(q, self.token_positions)
