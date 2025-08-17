@@ -47,3 +47,8 @@ uv run pytest -k test_gradient_clipping
 ```sh
 uv run pytest -k test_get_batch
 ```
+
+# Missing test
+```sh
+uv run pytest -k test_silu_matches_pytorch
+```
