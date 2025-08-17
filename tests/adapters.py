@@ -11,6 +11,7 @@ from torch import Tensor
 
 from cs336_basics.CosineLr import lr_cosiene_schedule
 from cs336_basics.Embedding import Embedding
+from cs336_basics.GradientClipping import gradient_clipping
 from cs336_basics.Linear import Linear
 from cs336_basics.Loss import cross_entropy_loss
 from cs336_basics.MultiheadSelfAttention import MultiheadSelfAttention
@@ -551,7 +552,7 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    gradient_clipping(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
