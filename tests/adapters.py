@@ -11,6 +11,7 @@ from torch import Tensor
 
 from cs336_basics.Embedding import Embedding
 from cs336_basics.Linear import Linear
+from cs336_basics.Loss import cross_entropy_loss
 from cs336_basics.MultiheadSelfAttention import MultiheadSelfAttention
 from cs336_basics.RMSNorm import RMSNorm
 from cs336_basics.RotaryPositionalEmbedding import RotaryPositionalEmbedding
@@ -536,7 +537,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return cross_entropy_loss(inputs, targets)
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:

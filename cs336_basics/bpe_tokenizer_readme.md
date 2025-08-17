@@ -34,3 +34,8 @@ uv run pytest -k test_multihead_self_attention
 uv run pytest -k test_transformer_block
 uv run pytest -k test_transformer_lm
 ```
+
+# Test 4.1
+```sh
+uv run pytest -k test_cross_entropy
+```
