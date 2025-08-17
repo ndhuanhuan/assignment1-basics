@@ -9,6 +9,7 @@ import numpy.typing as npt
 import torch
 from torch import Tensor
 
+from cs336_basics.BatchLoader import get_batch
 from cs336_basics.CosineLr import lr_cosiene_schedule
 from cs336_basics.Embedding import Embedding
 from cs336_basics.GradientClipping import gradient_clipping
@@ -506,7 +507,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
