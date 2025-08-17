@@ -20,6 +20,7 @@ from cs336_basics.TransformerLM import TransformerLM
 from cs336_basics.bpe_tokenizer import BPETokenizer
 from cs336_basics.SwiGLU import SwiGLU
 from cs336_basics.Attention import softmax, scaled_dot_product_attention
+from cs336_basics.AdamW import AdamW
 
 
 def run_linear(
@@ -556,7 +557,7 @@ def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
