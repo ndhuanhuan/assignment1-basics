@@ -9,6 +9,7 @@ import numpy.typing as npt
 import torch
 from torch import Tensor
 
+from cs336_basics.CosineLr import lr_cosiene_schedule
 from cs336_basics.Embedding import Embedding
 from cs336_basics.Linear import Linear
 from cs336_basics.Loss import cross_entropy_loss
@@ -585,7 +586,13 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return lr_cosiene_schedule(
+        it,
+        max_learning_rate,
+        min_learning_rate,
+        warmup_iters,
+        cosine_cycle_iters
+    )
 
 
 def run_save_checkpoint(

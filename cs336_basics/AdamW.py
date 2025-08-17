@@ -2,6 +2,7 @@ import math
 from typing import Iterable, Callable, Optional
 import torch
 
+# https://zhuanlan.zhihu.com/p/1928857996655588384
 class AdamW(torch.optim.Optimizer):
 
     def __init__(
